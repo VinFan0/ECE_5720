@@ -3,6 +3,7 @@
 ## LAB 1
 
 **Running**
+
 Provided in lab 1, the bomb lab, is a `.tar` file contains 2 files. 
 - `bomb` binary executable. This is the program to be run using gdb.
 - `bomb.c` limited C code. This file contains the main function for the lab and general structure of the program. 
