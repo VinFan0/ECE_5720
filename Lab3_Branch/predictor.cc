@@ -67,14 +67,13 @@ void PredictorReset() {
     brh_retire = 0;
 }
 
+// Variable state used for TWO_BIT_PREDICTOR
+char state[0xffff] = {1};
+
 void PredictorRunACycle() {
     // Stores info about what uops are being processed at each pipeline stage
     const cbp3_cycle_activity_t *cycle_info = get_cycle_info();
 
-    static uint8_t predictor_2b = 3; // Two-bit counter
-    bool gpred;// = false;
-
-    
     /*
     This `for` loop handles all instructions that come in during the
     fetch stage of the processor. During the fetch stage the branch
@@ -87,36 +86,24 @@ void PredictorRunACycle() {
     for (int i = 0; i < cycle_info->num_fetch; i++) {
         uint32_t fe_ptr = cycle_info->fetch_q[i];
         const cbp3_uop_dynamic_t *uop = &fetch_entry(fe_ptr)->uop;
-	
+
         if (!(uop->type & IS_BR_CONDITIONAL)) continue;
         if (runs == TWO_BIT_PREDICTOR_) {
             // -- PLACE YOUR TWO BIT SATURATING COUNTER PREDICTION CODE BELOW
             // (only put predictions in this section, updating states happens
-            // below)   
-
-            // Set `gpred` based off whether or not a branch should be taken
-	    	    
-	    switch ( predictor_2b ) {
-		case 0: 		// Strongly not taken
-		    gpred = 0;  
-		    break;
-
-		case 1:			// Weakly not taken
-		    gpred = 0; 
-		    break; 
-
-		case 2:			// Weakly taken
-		    gpred = 1;
-		    break; 
-
-	 	case 3:			// Strongly taken
-		    gpred = 1;
-		    break; 
-
-		default:
-		    gpred = 0;
-		    break; 
- 	    }
+            // below)
+	    // Set `gpred` based off whether or not a branch should be taken
+	    bool gpred = true;
+	    int index;
+	    index = uop->pc & 0x0000ffff;
+	    if (state[index] < 2)
+	    {
+		gpred = false;
+	    }
+	    else
+	    {
+		gpred = true;
+	    }
 
             assert(report_pred(fe_ptr, false, gpred));
 
@@ -141,11 +128,11 @@ void PredictorRunACycle() {
             assert(report_pred(fe_ptr, false, gpred));
 
         }
-	
+
         // -- UPDATE THE `brh_fetch` branch history register here. See "hints" in
         // the assignment description for more information on this.
     }
-    
+
     /*
     This loop handles all instsructions during the retire stage of the
     pipeline. At this stage it is known if the branch was actually taken
@@ -161,14 +148,22 @@ void PredictorRunACycle() {
 
         if (runs == TWO_BIT_PREDICTOR_) {
             // -- UPDATE THE STATE OF THE TWO BIT SATURATING COUNTER HERE
-	    if ( uop->br_taken ) {
-		if ( predictor_2b < 3 ) {
-		   predictor_2b++;  
-		} 
-	    } else if ( predictor_2b > 0) {
-	    	predictor_2b--;
+	    int index;
+            index = uop->pc & 0x0000ffff;
+	    if (uop->br_taken == 0)
+	    {
+		if (state[index] != 0)
+		{
+		    state[index]--;
+		}
 	    }
-
+	    else
+	    {
+		if (state[index] != 3)
+		{
+		    state[index]++;
+		}
+	    }
         } else if (runs == GSELECT_PREDICTOR_) {
             // -- UPDATE THE STATE OF THE GSELECT HERE
         } else if (runs == GSHARE_PREDICTOR_) {
@@ -179,8 +174,6 @@ void PredictorRunACycle() {
         // the assignment description for more information on this.
     }
 }
-
-
 
 void PredictorRunEnd() {
     runs ++;
