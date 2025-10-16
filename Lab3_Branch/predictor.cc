@@ -68,7 +68,16 @@ void PredictorReset() {
 }
 
 // Variable state used for TWO_BIT_PREDICTOR
-char state[0xffff] = {1};
+char state_2b[0xffff] = {1};
+
+// -------- GSELECT STUFF ----------//
+// Planning to use 4 bits of history for the XOR
+int history = 0; // Initialized to none taken
+
+// GSHARE Prediction Table
+// 4 bits of history XOR with 8 bits of branch address
+// 0xff, or 255 table entries
+char state_gselect[0xff] = {1}; // Begin at state 1
 
 void PredictorRunACycle() {
     // Stores info about what uops are being processed at each pipeline stage
@@ -96,7 +105,7 @@ void PredictorRunACycle() {
 	    bool gpred = true;
 	    int index;
 	    index = uop->pc & 0x0000ffff;
-	    if (state[index] < 2)
+	    if (state_2b[index] < 2)
 	    {
 		gpred = false;
 	    }
@@ -113,7 +122,17 @@ void PredictorRunACycle() {
             // below)
 
             // Set `gpred` based off whether or not a branch should be taken
-            bool gpred = true; 
+            bool gpred = true;
+
+	    // Collect lower byte of branch address
+	    uint8_t addr = uop->pc & 0xff;
+	    // XOR with lower nibble of history
+	    int index_gselect = addr ^ (history & 0xf);
+	    // Read from table at calculated index and set prediction 
+	    if (state_gselect[index_gselect] < 2) 
+		   gpred = false;
+	    else
+		   gpred = true; 
 
             assert(report_pred(fe_ptr, false, gpred));
 
@@ -152,20 +171,37 @@ void PredictorRunACycle() {
             index = uop->pc & 0x0000ffff;
 	    if (uop->br_taken == 0)
 	    {
-		if (state[index] != 0)
+		if (state_2b[index] != 0)
 		{
-		    state[index]--;
+		    state_2b[index]--;
 		}
 	    }
 	    else
 	    {
-		if (state[index] != 3)
+		if (state_2b[index] != 3)
 		{
-		    state[index]++;
+		    state_2b[index]++;
 		}
 	    }
         } else if (runs == GSELECT_PREDICTOR_) {
             // -- UPDATE THE STATE OF THE GSELECT HERE
+	    
+	    // Collect lower byte of branch address
+	    uint8_t addr = uop->pc & 0xff;
+	    // XOR with lower nibble of history
+	    int index_gselect = addr ^ (history & 0xf);
+	    // Collect branch result
+	    bool res_gselect = uop->br_taken;
+	    // Update history
+	    history = (history << 1) | res_gselect;
+	    // Update prediction table
+	    if (res_gselect) {
+		if (state_gselect[index_gselect] < 3) state_gselect[index_gselect]++;
+	    }
+	    else {
+	    	if (state_gselect[index_gselect] > 0) state_gselect[index_gselect]--;
+	    }
+ 
         } else if (runs == GSHARE_PREDICTOR_) {
             // -- UPDATE THE STATE OF THE GSHARE HERE
         }
