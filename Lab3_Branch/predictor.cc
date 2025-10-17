@@ -7,6 +7,7 @@ using namespace std;
 
 #include "cbp3_def.h"
 #include "cbp3_framework.h"
+#include "predictor.h"
 
 /*
 # Seperate Predictor Types
@@ -53,7 +54,7 @@ void PredictorInit() {
 // This function is called before EVERY run
 // It is used to reset predictors and change configurations
 void PredictorReset() {
-
+    
     // Predictor Specific Setup
     if (runs == TWO_BIT_PREDICTOR_)
         printf("Predictor: 2-bit saturating-counter\n");
@@ -67,8 +68,8 @@ void PredictorReset() {
     brh_retire = 0;
 }
 
-// Variable state used for TWO_BIT_PREDICTOR
-char state_2b[0xffff] = {1};
+// ------ 2-BIT SATURATION STUFF -------//
+uint8_t state_2b[B2_TABLE_SIZE] = {1};
 
 // -------- GSELECT STUFF ----------//
 // Planning to use 4 bits of history for the XOR
@@ -102,9 +103,8 @@ void PredictorRunACycle() {
             // (only put predictions in this section, updating states happens
             // below)
 	    // Set `gpred` based off whether or not a branch should be taken
-	    bool gpred = true;
-	    int index;
-	    index = uop->pc & 0x0000ffff;
+	    bool gpred = true; 
+	    int index = uop->pc & ((int) B2_TABLE_SIZE);
 	    if (state_2b[index] < 2)
 	    {
 		gpred = false;
