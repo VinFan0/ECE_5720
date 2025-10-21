@@ -49,6 +49,10 @@ uint32_t runs;
 // be any modifications here)
 void PredictorInit() {
     runs = 0;
+    printf("Prediction table sizes:\n");
+    printf("2-bit Saturation \t %x\n", B2_TABLE_SIZE);
+    printf("G-Select \t\t %x\n", G_SEL_TABLE_SIZE);
+    printf("\n");
 }
 
 // This function is called before EVERY run
@@ -72,13 +76,9 @@ void PredictorReset() {
 uint8_t state_2b[B2_TABLE_SIZE] = {1};
 
 // -------- GSELECT STUFF ----------//
-// Planning to use 4 bits of history for the XOR
-int history = 0; // Initialized to none taken
 
-// GSHARE Prediction Table
-// 4 bits of history XOR with 8 bits of branch address
-// 0xff, or 255 table entries
-char state_gselect[0xff] = {1}; // Begin at state 1
+// GSELECT Prediction Table
+char state_gselect[G_SEL_TABLE_SIZE] = {1}; // Begin at state 1
 
 void PredictorRunACycle() {
     // Stores info about what uops are being processed at each pipeline stage
@@ -126,15 +126,18 @@ void PredictorRunACycle() {
 
 	    // Collect lower byte of branch address
 	    uint8_t addr = uop->pc & 0xff;
-	    // XOR with lower nibble of history
-	    int index_gselect = addr ^ (history & 0xf);
+	    // XOR with N bits of history
+	    int index_gselect = addr ^ (brh_fetch & ((1 << G_SEL_HIS_BITS) - 1));
 	    // Read from table at calculated index and set prediction 
 	    if (state_gselect[index_gselect] < 2) 
 		   gpred = false;
 	    else
 		   gpred = true; 
-
-            assert(report_pred(fe_ptr, false, gpred));
+	   
+	    // Update brh_fetch GSelect
+	    brh_fetch = (brh_fetch << 1) | gpred;
+            
+	    assert(report_pred(fe_ptr, false, gpred));
 
         } else if (runs == GSHARE_PREDICTOR_) {
             // -- PLACE YOUR GSHARE PREDICTION CODE BELOW
@@ -150,6 +153,7 @@ void PredictorRunACycle() {
 
         // -- UPDATE THE `brh_fetch` branch history register here. See "hints" in
         // the assignment description for more information on this.
+	
     }
 
     /*
@@ -188,12 +192,10 @@ void PredictorRunACycle() {
 	    
 	    // Collect lower byte of branch address
 	    uint8_t addr = uop->pc & 0xff;
-	    // XOR with lower nibble of history
-	    int index_gselect = addr ^ (history & 0xf);
+	    // XOR with N bits of history
+	    int index_gselect = addr ^ (brh_retire & ((1 << G_SEL_HIS_BITS) - 1));
 	    // Collect branch result
 	    bool res_gselect = uop->br_taken;
-	    // Update history
-	    history = (history << 1) | res_gselect;
 	    // Update prediction table
 	    if (res_gselect) {
 		if (state_gselect[index_gselect] < 3) state_gselect[index_gselect]++;
@@ -201,13 +203,17 @@ void PredictorRunACycle() {
 	    else {
 	    	if (state_gselect[index_gselect] > 0) state_gselect[index_gselect]--;
 	    }
- 
+ 	    
+	    // Update brh_retire
+	    brh_retire = (brh_retire << 1) | uop->br_taken;
+
         } else if (runs == GSHARE_PREDICTOR_) {
             // -- UPDATE THE STATE OF THE GSHARE HERE
         }
 
         // -- UPDATE THE `brh_retire` branch history register here. See "hints" in
         // the assignment description for more information on this.
+	
     }
 }
 
