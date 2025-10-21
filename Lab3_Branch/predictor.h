@@ -12,7 +12,7 @@
  */
 // Size of prediction table: If M>N: 2^(M) If N>M: 2^(N)
 #define G_SEL_ADDR_BITS 16 // (M) Number of bits to use from PC for index
-#define G_SEL_HIS_BITS 0 // (N) Number of bits to use from history for index
+#define G_SEL_HIS_BITS 8 // (N) Number of bits to use from history for index
 
 #if G_SEL_ADDR_BITS > G_SEL_HIS_BITS
    #define G_SEL_TABLE_SIZE ((1 << G_SEL_ADDR_BITS) - 1)

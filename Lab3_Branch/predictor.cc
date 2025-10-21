@@ -125,7 +125,7 @@ void PredictorRunACycle() {
             bool gpred = true;
 
 	    // Collect lower byte of branch address
-	    uint8_t addr = uop->pc & 0xff;
+	    int addr = uop->pc & ((1 << G_SEL_ADDR_BITS) - 1);
 	    // XOR with N bits of history
 	    int index_gselect = addr ^ (brh_fetch & ((1 << G_SEL_HIS_BITS) - 1));
 	    // Read from table at calculated index and set prediction 
@@ -191,7 +191,7 @@ void PredictorRunACycle() {
             // -- UPDATE THE STATE OF THE GSELECT HERE
 	    
 	    // Collect lower byte of branch address
-	    uint8_t addr = uop->pc & 0xff;
+	    int addr = uop->pc & ((1 << G_SEL_ADDR_BITS) - 1);
 	    // XOR with N bits of history
 	    int index_gselect = addr ^ (brh_retire & ((1 << G_SEL_HIS_BITS) - 1));
 	    // Collect branch result
