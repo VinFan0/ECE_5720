@@ -49,9 +49,8 @@ uint32_t runs;
 // be any modifications here)
 void PredictorInit() {
     runs = 0;
-    printf("Prediction table sizes:\n");
-    printf("2-bit Saturation \t %x\n", B2_TABLE_SIZE);
-    printf("G-Select \t\t %x\n", G_SEL_TABLE_SIZE);
+    printf("G-Select table size\t %x\n", G_SHARE_TABLE_SIZE);
+    printf("History bitmask\t\t %d\n", G_SHARE_HIS_BITS);
     printf("\n");
 }
 
@@ -75,10 +74,10 @@ void PredictorReset() {
 // ------ 2-BIT SATURATION STUFF -------//
 uint8_t state_2b[B2_TABLE_SIZE] = {1};
 
-// -------- GSELECT STUFF ----------//
+// -------- GSHARE STUFF ----------//
 
-// GSELECT Prediction Table
-char state_gselect[G_SEL_TABLE_SIZE] = {1}; // Begin at state 1
+// GSHARE Prediction Table
+char state_gshare[G_SHARE_TABLE_SIZE] = {1}; // Begin at state 1
 
 void PredictorRunACycle() {
     // Stores info about what uops are being processed at each pipeline stage
@@ -124,18 +123,6 @@ void PredictorRunACycle() {
             // Set `gpred` based off whether or not a branch should be taken
             bool gpred = true;
 
-	    // Collect lower byte of branch address
-	    int addr = uop->pc & ((1 << G_SEL_ADDR_BITS) - 1);
-	    // XOR with N bits of history
-	    int index_gselect = addr ^ (brh_fetch & ((1 << G_SEL_HIS_BITS) - 1));
-	    // Read from table at calculated index and set prediction 
-	    if (state_gselect[index_gselect] < 2) 
-		   gpred = false;
-	    else
-		   gpred = true; 
-	   
-	    // Update brh_fetch GSelect
-	    brh_fetch = (brh_fetch << 1) | gpred;
             
 	    assert(report_pred(fe_ptr, false, gpred));
 
@@ -147,13 +134,28 @@ void PredictorRunACycle() {
             // Set `gpred` based off whether or not a branch should be taken
             bool gpred = true; 
 
+	    // Collect lower byte of branch address
+	    int addr = uop->pc & ((1 << G_SHARE_ADDR_BITS) - 1);
+	    int hist = brh_fetch & ((1 << G_SHARE_HIS_BITS) - 1);
+	    // XOR with N bits of history
+	    int index_gselect = addr ^ hist; 
+	    // Read from table at calculated index and set prediction 
+	    if (state_gshare[index_gselect] < 2) 
+		   gpred = false;
+	    else
+		   gpred = true; 
+	   
+	    
             assert(report_pred(fe_ptr, false, gpred));
 
         }
 
         // -- UPDATE THE `brh_fetch` branch history register here. See "hints" in
         // the assignment description for more information on this.
-	
+
+	// Update brh_fetch GSelect
+	brh_fetch = (brh_fetch << 1) | uop->br_taken;
+
     }
 
     /*
@@ -190,30 +192,34 @@ void PredictorRunACycle() {
         } else if (runs == GSELECT_PREDICTOR_) {
             // -- UPDATE THE STATE OF THE GSELECT HERE
 	    
-	    // Collect lower byte of branch address
-	    int addr = uop->pc & ((1 << G_SEL_ADDR_BITS) - 1);
-	    // XOR with N bits of history
-	    int index_gselect = addr ^ (brh_retire & ((1 << G_SEL_HIS_BITS) - 1));
-	    // Collect branch result
-	    bool res_gselect = uop->br_taken;
-	    // Update prediction table
-	    if (res_gselect) {
-		if (state_gselect[index_gselect] < 3) state_gselect[index_gselect]++;
-	    }
-	    else {
-	    	if (state_gselect[index_gselect] > 0) state_gselect[index_gselect]--;
-	    }
- 	    
-	    // Update brh_retire
-	    brh_retire = (brh_retire << 1) | uop->br_taken;
-
+	     	    
+	    
         } else if (runs == GSHARE_PREDICTOR_) {
             // -- UPDATE THE STATE OF THE GSHARE HERE
+	    
+	    // Collect lower byte of branch address
+	    int addr = uop->pc & ((1 << G_SHARE_ADDR_BITS) - 1);
+	    int hist = brh_retire & ((1 << G_SHARE_HIS_BITS) - 1);
+	    // XOR with N bits of history
+	    int index_gshare = addr ^ hist; 
+	    // Collect branch result
+	    bool res_gshare = uop->br_taken;
+	    // Update prediction table
+	    if (res_gshare) {
+		if (state_gshare[index_gshare] < 3) state_gshare[index_gshare]++;
+	    }
+	    else {
+	    	if (state_gshare[index_gshare] > 0) state_gshare[index_gshare]--;
+	    }
+
         }
 
         // -- UPDATE THE `brh_retire` branch history register here. See "hints" in
         // the assignment description for more information on this.
 	
+	// Update brh_retire
+	brh_retire = (brh_retire << 1) | uop->br_taken;
+
     }
 }
 
