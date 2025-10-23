@@ -69,8 +69,9 @@ void PredictorReset() {
 
 // Variable state used for TWO_BIT_PREDICTOR
 char state[0xffff] = {1};
-char state2[0xffff] = {1};
-char state3[0xffffff] = {1};
+char state2[0xffffff] = {1};
+char state3[0xffff] = {1};
+
 
 void PredictorRunACycle() {
     // Stores info about what uops are being processed at each pipeline stage
@@ -117,8 +118,8 @@ void PredictorRunACycle() {
             // Set `gpred` based off whether or not a branch should be taken
             bool gpred = true; 
 			int index;
-                        index = uop->pc & 0x00000ffff;
-                        index = index ^ (brh_fetch & 0x0000ffff);
+						index = uop->pc & 0x000000fff;
+                        index = (index << 12) | (brh_fetch & 0x00000fff);
                         if (state2[index] < 2)
                         {
                                 gpred = false;
@@ -138,8 +139,8 @@ void PredictorRunACycle() {
             // Set `gpred` based off whether or not a branch should be taken
             bool gpred = true; 
 			int index;
-                        index = uop->pc & 0x000000fff;
-                        index = (index << 12) | (brh_fetch & 0x00000fff);
+                        index = uop->pc & 0x00000ffff;
+                        index = index ^ (brh_fetch & 0x0000ffff);
                         if (state3[index] < 2)
                         {
                                 gpred = false;
@@ -192,8 +193,8 @@ void PredictorRunACycle() {
         } else if (runs == GSELECT_PREDICTOR_) {
             // -- UPDATE THE STATE OF THE GSELECT HERE
 			int index;
-                        index = uop->pc & 0x00000ffff;
-                        index = index ^ (brh_retire & 0x0000ffff);
+						index = uop->pc & 0x000000fff;
+                        index = (index << 12) | (brh_retire & 0x00000fff);
                         if (uop->br_taken == 0)
                         {
                                 if (state2[index] != 0)
@@ -211,8 +212,8 @@ void PredictorRunACycle() {
         } else if (runs == GSHARE_PREDICTOR_) {
             // -- UPDATE THE STATE OF THE GSHARE HERE
 	    		int index;
-                        index = uop->pc & 0x000000fff;
-                        index = (index << 12) | (brh_retire & 0x00000fff);
+                        index = uop->pc & 0x00000ffff;
+                        index = index ^ (brh_retire & 0x0000ffff);
                         if (uop->br_taken == 0)
                         {
                                 if (state3[index] != 0)
