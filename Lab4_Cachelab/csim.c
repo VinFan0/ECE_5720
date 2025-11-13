@@ -16,7 +16,7 @@ void printArgs();
 int indexBits;
 int lineCount;
 int offsetBits;
-char traceFile[16];
+char traceFile[32];
 
 int main(int argc, char* argv[])
 {
@@ -44,10 +44,16 @@ int main(int argc, char* argv[])
     indexBits = atoi(argv[2]);
     lineCount = atoi(argv[4]);
     offsetBits = atoi(argv[6]);
-    strncpy(argv[6], traceFile, 16);
-    traceFile[15] = '\0';
-
+   
+    strncpy(traceFile, argv[8], sizeof(traceFile) - 1);
+    traceFile[sizeof(traceFile)-1] = '\0';
+    
+    // DEBUG: display input arguments
     printArgs();
+
+    // Generate Cache Table
+
+    // Iterate through traceFile lines
 
     // Finish with this
     printSummary(0, 0, 0);
@@ -73,6 +79,8 @@ void printHelp() {
    printf("Example:\n");
    printf("  linux>  ./csim -s 4 -E 1 -b 4 -t traces/yi.trace\n");
 }
+
+
 
 void printError() {
    printf("./csim: Missing required command line argument\n");
