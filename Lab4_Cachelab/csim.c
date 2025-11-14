@@ -8,15 +8,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-// DEBUG AND HELPER FUNCTIONS
-void printHelp();
-void printError();
-void printArgs();
-
-// CACHE SIMULATION FUNCTIONS
-cache* createCache(int s, int E, int b);
-void freeCache(cache* c);
+#include <stdbool.h>
+#include <stdint.h>
 
 // CACHE SIMULATION VARIABLES AND TYPES
 int indexBits;
@@ -28,19 +21,36 @@ typedef struct {
     bool valid;
     int tag;
     int block;
+    int accessTime;
 } line;
 
 typedef struct {
     line* lines;
 } set;
 
-typedf struct {
+typedef struct {
     set* sets;
     int s;
     int E;
     int b;
+    unsigned long long useCounter;
 } cache;
 
+typedef struct {
+    uint64_t tag;
+    uint64_t idx;
+    uint64_t offset;
+} addressParts;
+
+// DEBUG AND HELPER FUNCTIONS
+void printHelp();
+void printError();
+void printArgs();
+
+// CACHE SIMULATION FUNCTIONS
+cache* createCache(int s, int E, int b);
+void freeCache(cache* c);
+addressParts parseAddress(uint64_t address, int s, int b);
 
 // MAIN FUNCTION CODE
 int main(int argc, char* argv[])
@@ -78,7 +88,7 @@ int main(int argc, char* argv[])
     printArgs();
 
     // Generate Cache Table
-    cache myCache = creatCache(indexBits, lineCount, offsetBits);
+    cache* myCache = createCache(indexBits, lineCount, offsetBits);
 
     // Iterate through traceFile lines
 
@@ -88,6 +98,55 @@ int main(int argc, char* argv[])
     // Get summary for grading
     printSummary(0, 0, 0);
     return 0;
+}
+/*
+ * Function:	getEvictLine
+ * Input:	set <set_> - Set to evict a line from
+ * 		int <lineCount_> - set associativity
+ * Output:	int <victim> - index (0-E) of which line to evict from <set_>
+ * Description:
+ * Take in <set_> and <lineCount_> and iterate through each line within the set
+ * to find the lowest (oldest) accessTime. The index of the line with the lowest
+ * accessTime is returned to the calling function to perform the cache eviction.
+ * 
+ * NOTE: the index being returned IS NOT equivalent to the cache tag. The index
+ * is merely where in the set the line to evict exists.
+ */
+int getEvictLine(set set_, int lineCount_) {
+    int victim = 0;
+    int lowest = set_.lines[0].accessTime;
+    int i;
+    for(i = 1; i < lineCount_; i++) {
+    	if (set_.lines[i].accessTime < lowest) {
+	    lowest = set_.lines[i].accessTime;
+	    victim = i;
+	}	
+    }
+
+    return i;
+}
+
+/*
+ * Function:	parseAddress
+ * Input:	uint64_t <address>
+ * 		int <s>
+ * 		int <b>
+ * Output:	addressParts - addressParts struct with parsed address data
+ * Description:
+ * Take in an address and user defined set index bits and block offset bits
+ * and parse the useful data into an addressParts struct.
+ */
+addressParts parseAddress(uint64_t address, int s, int b) {
+    addressParts parts;
+
+    uint64_t idxMask = (uint64_t)((1 << s) - 1);
+    uint64_t offsetMask = (uint64_t)((1 << b) - 1);
+
+    parts.offset = address & offsetMask;
+    parts.idx = (address >> b) & idxMask;
+    parts.tag = address >> (s + b);
+
+    return parts;
 }
 
 /*
@@ -100,25 +159,28 @@ int main(int argc, char* argv[])
  * Take input arguments for cache parameters <s>, <E>, <b> and
  * dynamically allocate the simulation cache, with its respective
  * sets and lines. Initialize each line as
- * 	valid	= false
- * 	tag	= -1
- * 	block	= 0 
+ * 	valid		= false
+ * 	tag		= -1
+ * 	block		= 0
+ * 	accessTime	= 0
  */
 cache* createCache(int s, int E, int b) {
     cache* c = malloc(sizeof(cache));
     c->s = s;
     c->E = E;
     c->b = b;
+    c->useCounter = 0;
 
     int S = 1 << s;
-    c->sets = malloc(S * sizeof(set));
+    c->sets = malloc((long unsigned int)S * sizeof(set));
 
     for (int i=0; i < S; i++) {
-    	c->sets[i].lines = malloc(E * sizeof(line));
+    	c->sets[i].lines = malloc((long unsigned int)E * sizeof(line));
 	for (int j = 0; j < E; j++) {
 	    c->sets[i].lines[j].valid = false;
 	    c->sets[i].lines[j].tag = -1;
 	    c->sets[i].lines[j].block = 0;
+	    c->sets[i].lines[j].accessTime = 0;
 	}
     }
 
