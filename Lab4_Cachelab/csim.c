@@ -16,15 +16,16 @@ int indexBits;
 int lineCount;
 int offsetBits;
 char traceFile[32];
-uint64_t hits = 0;
-uint64_t misses = 0;
-uint64_t evictions = 0;
+int hits = 0;
+int misses = 0;
+int evictions = 0;
+bool verboseOutput = false;
 
 typedef struct {
     bool valid;
     int tag;
-    int block;
-    int accessTime;
+    unsigned long long block;
+    unsigned long long accessTime;
 } line;
 
 typedef struct {
@@ -36,13 +37,13 @@ typedef struct {
     int s;
     int E;
     int b;
-    uint64_t accessCounter;
+    unsigned long long accessCounter;
 } cache;
 
 typedef struct {
-    uint64_t tag;
-    uint64_t idx;
-    uint64_t offset;
+    int tag;
+    int idx;
+    int offset;
 } addressParts;
 
 // DEBUG AND HELPER FUNCTIONS
@@ -53,8 +54,10 @@ void printArgs();
 // CACHE SIMULATION FUNCTIONS
 cache* createCache(int s, int E, int b);
 void freeCache(cache* c);
-addressParts parseAddress(uint64_t address, int s, int b);
-int getEvictLine(set *set_, int lineCount_);
+addressParts parseAddress(unsigned long long address, int s, int b);
+int getEvictLine(set *set_);
+void runTrace(cache *c);
+void retrieveCacheLine(cache *c, unsigned long long addr);
 
 // MAIN FUNCTION CODE
 int main(int argc, char* argv[])
@@ -63,45 +66,62 @@ int main(int argc, char* argv[])
     // Required flags: s, E, b, t
     // Optional flags: h
     if(argc > 1) {
-       if(strcmp(argv[1], "-h") == 0) {
-          printHelp();
-          return 0;
-       } else {
-          if(argc < 9) {
-	     printError();
-	     printHelp();
-	     return 0;
-	  }
-       }
+        if(strcmp(argv[1], "-h") == 0) {
+            printHelp();
+            return 0;
+        } else if (strcmp(argv[1], "-v") == 0) {
+            verboseOutput = true;
+	    if(argc < 10) {
+	        printError();
+	        printHelp();
+                return 0;
+	    }
+	
+        } else if(argc < 9) {
+	    printError();
+	    printHelp();
+            return 0;
+        }
     } else {
-       printError();
-       printHelp();
-       return 0;
+        printError();
+        printHelp();
+        return 0;
     }
 
     //Flag check succeeded
     // Collect input argments in global variables
-    indexBits = atoi(argv[2]);
-    lineCount = atoi(argv[4]);
-    offsetBits = atoi(argv[6]);
+    if (verboseOutput) {
+	indexBits = atoi(argv[3]);
+    	lineCount = atoi(argv[5]);
+    	offsetBits = atoi(argv[7]);
    
-    strncpy(traceFile, argv[8], sizeof(traceFile) - 1);
-    traceFile[sizeof(traceFile)-1] = '\0';
+    	strncpy(traceFile, argv[9], sizeof(traceFile) - 1);
+    	traceFile[sizeof(traceFile)-1] = '\0';
+    } else {
+    	indexBits = atoi(argv[2]);
+    	lineCount = atoi(argv[4]);
+    	offsetBits = atoi(argv[6]);
+   
+    	strncpy(traceFile, argv[8], sizeof(traceFile) - 1);
+    	traceFile[sizeof(traceFile)-1] = '\0';
+
+    }
     
     // DEBUG: display input arguments
-    printArgs();
+    // printArgs();
 
     // Generate Cache Table
     cache* myCache = createCache(indexBits, lineCount, offsetBits);
 
-   
+    // Run trace
+    runTrace(myCache);   
 
     // WRAP UP PROCESS
     // Deallocate cache
     freeCache(myCache);
 
     // Get summary for grading
-    printSummary(0, 0, 0);
+    printSummary(hits, misses, evictions);
     return 0;
 }
 /*
@@ -115,37 +135,39 @@ int main(int argc, char* argv[])
  * generate an access to the cache. Modify instrucitons incur a second access,
  * as they are essentially a Load+Store pair.
  */
-void runTrace(cache *c, char *traceFile) {
+void runTrace(cache *c) {
     FILE *fp = fopen(traceFile, "r");
     if (!fp) {
     	printf("ERROR: cannot open trace file %s\n", traceFile);
 	exit(1);
     }
 
-    uint8_t operation;
-    uint64_t addr;
-    uint32_t size;
+    char operation;
+    unsigned long long addr;
+    int size;
 
-    while (fscanf(fp, " %c %llx,%d", &op, &addr, &size) == 3) {
-    	if (op == "I")
+    while (fscanf(fp, " %c %llx,%d", &operation, &addr, &size) == 3) {
+    	if (operation == 'I')
 	    continue;
 
-	switch (op) {
-		case 'L':
-		case 'S':
-			retrieveCacheLine(c, addr);
-			break;
+	if (verboseOutput) printf("%c %llx,%d", operation, addr, size);
+	switch (operation) {
+	    case 'L':
+	    case 'S':
+		retrieveCacheLine(c, addr);
+		break;
 
-		case 'M':
-			retrieveCacheLine(c, addr);
-			retrieveCacheLine(c, addr);
-			break;
+	    case 'M':
+		retrieveCacheLine(c, addr);
+		retrieveCacheLine(c, addr);
+		break;
 
-		default:
-			printf("Read something weird: %c\n", op);
-			break;
+	    default:
+		printf("Read something weird: %c\n", operation);
+		break;
 
 	}
+	if (verboseOutput) printf("\n");
     }
 
     fclose(fp);
@@ -155,7 +177,7 @@ void runTrace(cache *c, char *traceFile) {
 /*
  * Function:	retrieveCacheLine
  * Input:	cache *<c>
- * 		uint64_t <addr>
+ * 		unsigned long long <addr>
  * Output:	void
  * Description:
  * Take in the cache <c> with address to access <addr> and parse <addr> into
@@ -174,7 +196,7 @@ void runTrace(cache *c, char *traceFile) {
  *		Increment evictions and call getEvictLine to find oldest entry in
  *		the set. Replace the found line with the accessed line.
  */
-void retrieveCacheLine(cache *c, uint64_t addr) {
+void retrieveCacheLine(cache *c, unsigned long long addr) {
     addressParts parts = parseAddress(addr, indexBits, offsetBits);
     set * curSet = &c->sets[parts.idx];
     c->accessCounter++;
@@ -182,12 +204,14 @@ void retrieveCacheLine(cache *c, uint64_t addr) {
     for (int i = 0; i < lineCount; i++) {
     	line *line_ = &curSet->lines[i];
 	if (line_->valid && line_->tag == parts.tag) {
+	    if (verboseOutput) printf(" hit");
 	    hits++;
 	    line_->accessTime = c->accessCounter;
 	    return;
 	}
     }
 
+    if (verboseOutput) printf(" miss");
     misses++;
 
     for (int i = 0; i < lineCount; i++) {
@@ -200,9 +224,10 @@ void retrieveCacheLine(cache *c, uint64_t addr) {
 	}
     }
 
+    if (verboseOutput) printf(" eviction");
     evictions++;
 
-    uint32_t victimIndex = getEvictLine(curSet);
+    int victimIndex = getEvictLine(curSet);
     line *victimLine = &curSet->lines[victimIndex];
     victimLine->tag = parts.tag;
     victimLine->accessTime = c->accessCounter;
@@ -215,7 +240,7 @@ void retrieveCacheLine(cache *c, uint64_t addr) {
  * Input:	set *<set_> - Set to evict a line from 
  * Output:	int <victim> - index (0-E) of which line to evict from <set_>
  * Description:
- * Take in <set_> and <lineCount_> and iterate through each line within the set
+ * Take in <set_> and and iterate through each line within the set
  * to find the lowest (oldest) accessTime. The index of the line with the lowest
  * accessTime is returned to the calling function to perform the cache eviction.
  * 
@@ -224,9 +249,9 @@ void retrieveCacheLine(cache *c, uint64_t addr) {
  */
 int getEvictLine(set *set_) {
     int victim = 0;
-    int lowest = set_->lines[0].accessTime;
+    unsigned long long lowest = set_->lines[0].accessTime;
     
-    for(int i = 1; i < lineCount_; i++) {
+    for(int i = 1; i < lineCount; i++) {
     	if (set_->lines[i].accessTime < lowest) {
 	    lowest = set_->lines[i].accessTime;
 	    victim = i;
@@ -238,7 +263,7 @@ int getEvictLine(set *set_) {
 
 /*
  * Function:	parseAddress
- * Input:	uint64_t <address>
+ * Input:	unsigned long long <address>
  * 		int <s>
  * 		int <b>
  * Output:	addressParts - addressParts struct with parsed address data
@@ -246,15 +271,15 @@ int getEvictLine(set *set_) {
  * Take in an address and user defined set index bits and block offset bits
  * and parse the useful data into an addressParts struct.
  */
-addressParts parseAddress(uint64_t address, int s, int b) {
+addressParts parseAddress(unsigned long long address, int s, int b) {
     addressParts parts;
 
-    uint64_t idxMask = (uint64_t)((1 << s) - 1);
-    uint64_t offsetMask = (uint64_t)((1 << b) - 1);
+    unsigned long long idxMask = (unsigned long long)((1 << s) - 1);
+    unsigned long long offsetMask = (unsigned long long)((1 << b) - 1);
 
-    parts.offset = address & offsetMask;
-    parts.idx = (address >> b) & idxMask;
-    parts.tag = address >> (s + b);
+    parts.offset = (int) (address & offsetMask);
+    parts.idx = (int) ((address >> b) & idxMask);
+    parts.tag = (int) (address >> (s + b));
 
     return parts;
 }
