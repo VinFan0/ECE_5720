@@ -16,6 +16,9 @@ int indexBits;
 int lineCount;
 int offsetBits;
 char traceFile[32];
+uint64_t hits = 0;
+uint64_t misses = 0;
+uint64_t evictions = 0;
 
 typedef struct {
     bool valid;
@@ -33,7 +36,7 @@ typedef struct {
     int s;
     int E;
     int b;
-    unsigned long long useCounter;
+    uint64_t accessCounter;
 } cache;
 
 typedef struct {
@@ -51,6 +54,7 @@ void printArgs();
 cache* createCache(int s, int E, int b);
 void freeCache(cache* c);
 addressParts parseAddress(uint64_t address, int s, int b);
+int getEvictLine(set *set_, int lineCount_);
 
 // MAIN FUNCTION CODE
 int main(int argc, char* argv[])
@@ -90,8 +94,9 @@ int main(int argc, char* argv[])
     // Generate Cache Table
     cache* myCache = createCache(indexBits, lineCount, offsetBits);
 
-    // Iterate through traceFile lines
+   
 
+    // WRAP UP PROCESS
     // Deallocate cache
     freeCache(myCache);
 
@@ -100,9 +105,114 @@ int main(int argc, char* argv[])
     return 0;
 }
 /*
+ * Function:	runTrace
+ * Input:	cache *<c> - dynamically allocated cache
+ * 		char * <traceFile> - User input trace file
+ * Output:	void
+ * Description:
+ * Iterate through lines of the tracefile, searching for non-instruction load
+ * operations. Any other operations (Load (L), Store (S), Modify (M)) will
+ * generate an access to the cache. Modify instrucitons incur a second access,
+ * as they are essentially a Load+Store pair.
+ */
+void runTrace(cache *c, char *traceFile) {
+    FILE *fp = fopen(traceFile, "r");
+    if (!fp) {
+    	printf("ERROR: cannot open trace file %s\n", traceFile);
+	exit(1);
+    }
+
+    uint8_t operation;
+    uint64_t addr;
+    uint32_t size;
+
+    while (fscanf(fp, " %c %llx,%d", &op, &addr, &size) == 3) {
+    	if (op == "I")
+	    continue;
+
+	switch (op) {
+		case 'L':
+		case 'S':
+			retrieveCacheLine(c, addr);
+			break;
+
+		case 'M':
+			retrieveCacheLine(c, addr);
+			retrieveCacheLine(c, addr);
+			break;
+
+		default:
+			printf("Read something weird: %c\n", op);
+			break;
+
+	}
+    }
+
+    fclose(fp);
+}
+
+
+/*
+ * Function:	retrieveCacheLine
+ * Input:	cache *<c>
+ * 		uint64_t <addr>
+ * Output:	void
+ * Description:
+ * Take in the cache <c> with address to access <addr> and parse <addr> into
+ * an addressParts struct using parseAddress. Increment the LRU accessCounter.
+ * With the parsed data, search the requested set for a matching tag and valid bit.
+ * If yes, 
+ * 	increment hits, update accessTime for that line, and return. 
+ *
+ * Else, 
+ * 	increment misses and search for an empty line (invalid bit) in the set to
+ * 	insert the accessed line into. 
+ * 	If successful,
+ * 		update the cache line with address data, including valid bit,
+ *		tag, and accessTime and return
+ *	Else, (no free lines)
+ *		Increment evictions and call getEvictLine to find oldest entry in
+ *		the set. Replace the found line with the accessed line.
+ */
+void retrieveCacheLine(cache *c, uint64_t addr) {
+    addressParts parts = parseAddress(addr, indexBits, offsetBits);
+    set * curSet = &c->sets[parts.idx];
+    c->accessCounter++;
+
+    for (int i = 0; i < lineCount; i++) {
+    	line *line_ = &curSet->lines[i];
+	if (line_->valid && line_->tag == parts.tag) {
+	    hits++;
+	    line_->accessTime = c->accessCounter;
+	    return;
+	}
+    }
+
+    misses++;
+
+    for (int i = 0; i < lineCount; i++) {
+    	line *line_ = &curSet->lines[i];
+	if (!line_->valid) {
+	    line_->valid = true;
+	    line_->tag = parts.tag;
+	    line_->accessTime = c->accessCounter;
+	    return;
+	}
+    }
+
+    evictions++;
+
+    uint32_t victimIndex = getEvictLine(curSet);
+    line *victimLine = &curSet->lines[victimIndex];
+    victimLine->tag = parts.tag;
+    victimLine->accessTime = c->accessCounter;
+    victimLine->valid = true;
+}
+
+
+/*
  * Function:	getEvictLine
- * Input:	set <set_> - Set to evict a line from
- * 		int <lineCount_> - set associativity
+ * Input:	set *<set_> - Set to evict a line from 
  * Output:	int <victim> - index (0-E) of which line to evict from <set_>
  * Description:
  * Take in <set_> and <lineCount_> and iterate through each line within the set
@@ -112,18 +222,18 @@ int main(int argc, char* argv[])
  * NOTE: the index being returned IS NOT equivalent to the cache tag. The index
  * is merely where in the set the line to evict exists.
  */
-int getEvictLine(set set_, int lineCount_) {
+int getEvictLine(set *set_) {
     int victim = 0;
-    int lowest = set_.lines[0].accessTime;
-    int i;
-    for(i = 1; i < lineCount_; i++) {
-    	if (set_.lines[i].accessTime < lowest) {
-	    lowest = set_.lines[i].accessTime;
+    int lowest = set_->lines[0].accessTime;
+    
+    for(int i = 1; i < lineCount_; i++) {
+    	if (set_->lines[i].accessTime < lowest) {
+	    lowest = set_->lines[i].accessTime;
 	    victim = i;
 	}	
     }
 
-    return i;
+    return victim;
 }
 
 /*
@@ -169,7 +279,7 @@ cache* createCache(int s, int E, int b) {
     c->s = s;
     c->E = E;
     c->b = b;
-    c->useCounter = 0;
+    c->accessCounter = 0;
 
     int S = 1 << s;
     c->sets = malloc((long unsigned int)S * sizeof(set));
