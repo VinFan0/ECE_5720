@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <unistd.h>
+#include <getopt.h>
 
 // CACHE SIMULATION VARIABLES AND TYPES
 int indexBits;
@@ -65,50 +67,56 @@ int main(int argc, char* argv[])
     // Flag check
     // Required flags: s, E, b, t
     // Optional flags: h
-    if(argc > 1) {
-        if(strcmp(argv[1], "-h") == 0) {
-            printHelp();
-            return 0;
-        } else if (strcmp(argv[1], "-v") == 0) {
-            verboseOutput = true;
-	    if(argc < 10) {
-	        printError();
-	        printHelp();
-                return 0;
-	    }
-	
-        } else if(argc < 9) {
-	    printError();
-	    printHelp();
-            return 0;
-        }
-    } else {
-        printError();
-        printHelp();
-        return 0;
+    int opt;
+    int sFlag = 0, eFlag = 0, bFlag = 0, tFlag = 0;
+
+    while((opt = getopt(argc, argv, "s:E:b:t:vh")) != -1) {
+    	switch (opt) {
+	    case 'h':
+		printHelp();
+		return 0;
+
+	    case 'v':
+		verboseOutput = true;
+		break;
+
+	    case 's':
+		indexBits = atoi(optarg);
+		sFlag = 1;
+		break;
+
+	    case 'E':
+		lineCount = atoi(optarg);
+		eFlag = 1;
+		break;
+
+	    case 'b':
+		offsetBits = atoi(optarg);
+		bFlag = 1;
+		break;
+
+	    case 't':
+		strncpy(traceFile, optarg, sizeof(traceFile)-1);
+		traceFile[sizeof(traceFile)-1] = '\0';
+		tFlag = 1;
+		break;
+
+	    default:
+		printError();
+		printHelp();
+		return 1;
+	}
     }
 
-    //Flag check succeeded
-    // Collect input argments in global variables
-    if (verboseOutput) {
-	indexBits = atoi(argv[3]);
-    	lineCount = atoi(argv[5]);
-    	offsetBits = atoi(argv[7]);
-   
-    	strncpy(traceFile, argv[9], sizeof(traceFile) - 1);
-    	traceFile[sizeof(traceFile)-1] = '\0';
-    } else {
-    	indexBits = atoi(argv[2]);
-    	lineCount = atoi(argv[4]);
-    	offsetBits = atoi(argv[6]);
-   
-    	strncpy(traceFile, argv[8], sizeof(traceFile) - 1);
-    	traceFile[sizeof(traceFile)-1] = '\0';
-
+    if (!sFlag || !eFlag || !bFlag || !tFlag) {
+    	printError();
+	printHelp();
+	return 1;
     }
-    
+
+   
     // DEBUG: display input arguments
-    // printArgs();
+    printArgs();
 
     // Generate Cache Table
     cache* myCache = createCache(indexBits, lineCount, offsetBits);
