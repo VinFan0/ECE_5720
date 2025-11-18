@@ -1,5 +1,7 @@
 /* 
  * trans.c - Matrix transpose B = A^T
+ * Ryan Beck A02237765
+ * Josh Christensen
  *
  * Each transpose function must have a prototype of the form:
  * void trans(int M, int N, int A[N][M], int B[M][N]);
@@ -398,6 +400,132 @@ void block_zigzag_trans_2(int M, int N, int A[N][M], int B[M][N])
     }
 }
 
+/*
+*	function GPT_transpose
+*	best results found when block = 8
+*/
+#define BLOCK_32 8
+#define BLOCK_64 8
+#define BLOCK_GENERIC 16
+
+char GPT_transpose_desc[] = "GPT Generated Transpose";
+
+void GPT_transpose(int M, int N, int A[N][M], int B[M][N])
+{
+    // -----------------------------
+    // Case 1: 32x32
+    // -----------------------------
+    if (M == 32 && N == 32) {
+        for (int ii = 0; ii < N; ii += BLOCK_32) {
+            for (int jj = 0; jj < M; jj += BLOCK_32) {
+                for (int i = ii; i < ii + BLOCK_32; i++) {
+                    int diag = -1;
+                    int diag_val = 0;
+                    for (int j = jj; j < jj + BLOCK_32; j++) {
+                        if (i == j) {
+                            diag = j;
+                            diag_val = A[i][j];
+                        } else {
+                            B[j][i] = A[i][j];
+                        }
+                    }
+                    if (diag != -1) {
+                        B[diag][diag] = diag_val;
+                    }
+                }
+            }
+        }
+        return;
+    }
+
+    // -----------------------------
+    // Case 2: 64x64
+    // -----------------------------
+    if (M == 64 && N == 64) {
+	for (int ii = 0; ii < 64; ii += BLOCK_64) {
+            for (int jj = 0; jj < 64; jj += BLOCK_64) {
+	        
+		int a0, a1, a2, a3, a4, a5, a6, a7; // 8 Local variables
+
+		for (int i=0; i<4; i++) {
+		    a0 = A[ii+i][jj+0];
+		    a1 = A[ii+i][jj+1];
+		    a2 = A[ii+i][jj+2];
+		    a3 = A[ii+i][jj+3];
+		    a4 = A[ii+i][jj+4];
+		    a5 = A[ii+i][jj+5];
+		    a6 = A[ii+i][jj+6];
+		    a7 = A[ii+i][jj+7];
+
+		    B[jj+0][ii+i] = a0;
+		    B[jj+1][ii+i] = a1;
+		    B[jj+2][ii+i] = a2;
+		    B[jj+3][ii+i] = a3;
+
+		    B[jj+0][ii+i+4] = a4;
+		    B[jj+1][ii+i+4] = a5;
+		    B[jj+2][ii+i+4] = a6;
+		    B[jj+3][ii+i+4] = a7;
+
+		}
+
+		for (int j = 0; j < 4; j++) {
+		    a0 = A[ii+4][jj+j];
+		    a1 = A[ii+5][jj+j];
+		    a2 = A[ii+6][jj+j];
+		    a3 = A[ii+7][jj+j];
+
+		    int b0, b1, b2, b3; // 4 Local variables
+
+		    b0 =B[jj+j][ii+4];
+		    b1 =B[jj+j][ii+5];
+		    b2 =B[jj+j][ii+6];
+		    b3 =B[jj+j][ii+7];
+
+		    B[jj+j][ii+4] = a0;
+		    B[jj+j][ii+5] = a1;
+		    B[jj+j][ii+6] = a2;
+		    B[jj+j][ii+7] = a3;
+
+		    B[jj+j+4][ii+0] = b0;
+		    B[jj+j+4][ii+1] = b1;
+		    B[jj+j+4][ii+2] = b2;
+		    B[jj+j+4][ii+3] = b3;
+		}
+
+		for (int i = 4; i < 8; i++) {
+		    a0 = A[ii+i][jj+4];
+		    a1 = A[ii+i][jj+5];
+		    a2 = A[ii+i][jj+6];
+		    a3 = A[ii+i][jj+7];
+
+		    B[jj+4][ii+i] = a0;
+		    B[jj+5][ii+i] = a1;
+		    B[jj+6][ii+i] = a2;
+		    B[jj+7][ii+i] = a3;
+
+		}
+            }
+	}
+
+        return;
+    }
+
+    // -----------------------------
+    // Case 3: Generic sizes (e.g., 61x67)
+    // -----------------------------
+    for (int ii = 0; ii < N; ii += BLOCK_GENERIC) {
+        for (int jj = 0; jj < M; jj += BLOCK_GENERIC) {
+            int i_end = (ii + BLOCK_GENERIC < N) ? ii + BLOCK_GENERIC : N;
+            int j_end = (jj + BLOCK_GENERIC < M) ? jj + BLOCK_GENERIC : M;
+            for (int i = ii; i < i_end; i++) {
+                for (int j = jj; j < j_end; j++) {
+                    B[j][i] = A[i][j];
+                }
+            }
+        }
+    }
+}
 
 
 /*
@@ -414,8 +542,9 @@ void registerFunctions(void)
 
     /* Register any additional transpose functions */
     //registerTransFunction(block_trans, block_trans_desc);
-    registerTransFunction(block_asym_trans, block_asym_trans_desc);
-    registerTransFunction(block_zigzag_trans_2, block_zigzag_trans_2_desc);
+    //registerTransFunction(block_asym_trans, block_asym_trans_desc);
+    //registerTransFunction(block_zigzag_trans_2, block_zigzag_trans_2_desc);
+    registerTransFunction(GPT_transpose, GPT_transpose_desc);
 }
 
 /* 
