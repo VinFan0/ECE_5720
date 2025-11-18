@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include "cachelab.h"
 
-#define BLOCK 5
+#define BLOCK 4
 
 int is_transpose(int M, int N, int A[N][M], int B[M][N]);
 void trans(int M, int N, int A[N][M], int B[M][N]);	// Basic transpose function
@@ -302,6 +302,105 @@ void zigzag_transpose(int N_start, int M_start, int M, int N, int A[N][M], int B
 
 
 /*
+*	function block_zigzag_trans_2
+*	blocking zigzag access function made to run with asymetric matricies with any matrix size
+*	best results found when block = 4
+*/
+char block_zigzag_trans_2_desc[] = "block based zigzag access transpose function";
+void block_zigzag_trans_2(int M, int N, int A[N][M], int B[M][N])
+{
+    const int block_i = 4;
+    const int block_j = 4;
+    int i = 0;
+    int j = 0;
+    int	ii, jj;
+    int M_tail = M % block_j;
+    int N_tail = N % block_i;
+    M -= M_tail;
+    N-= N_tail;
+
+    int dir = 1;   // 1 = up-right, 0 = down-left
+    int flag = 0;
+    int tmp;
+
+    while (!flag)
+    {
+	for (ii = i; ii < i + block_i; ii++)
+	{
+	    for (jj = j; jj < j + block_j; jj++)
+	    {
+		tmp = A[ii][jj];
+		B[jj][ii] = tmp;
+	    }
+	}
+
+        if (dir == 1)    // up-right
+        {
+            if (i == N - block_i) {
+                j += block_j;         // move down
+                dir = 0;     // switch
+            }
+            else if (j == 0) {
+                i += block_i;         // move right
+                dir = 0;     // switch
+            }
+            else {
+                i += block_i;         // move up-right
+                j -= block_j;
+            }
+        }
+        else              // down-left
+        {
+            if (j == M - block_j) {
+                i += block_i;         // move right
+                dir = 1;     // switch
+            }
+            else if (i == 0) {
+                j += block_j;         // move down
+                dir = 1;     // switch
+            }
+            else {
+                i -= block_i;         // move down-left
+                j += block_j;
+            }
+        }
+
+        if ((i == N - block_i) && (j == M - block_j))
+            flag = 1;
+    }
+
+    // fill in final block
+    for (ii = i; ii < i + block_i; ii++)
+    {
+	for (jj = j; jj < j + block_j; jj++)
+	{
+	    tmp = A[ii][jj];
+	    B[jj][ii] = tmp;
+	}
+    } 
+
+    // transpose tail manually
+    for (i = N; i < N+N_tail; i++)
+    {
+	for (j = 0; j < M+M_tail; j++)
+	{
+	    tmp = A[i][j];
+	    B[j][i] = tmp;
+	}
+    }
+    for (j = M; j < M+M_tail; j++)
+    {
+	for (i = 0; i < N; i++)
+	{
+	    tmp = A[i][j];
+	    B[j][i] = tmp;
+	}
+    }
+}
+
+
+
+/*
  * registerFunctions - This function registers your transpose
  *     functions with the driver.  At runtime, the driver will
  *     evaluate each of the registered functions and summarize their
@@ -316,7 +415,7 @@ void registerFunctions(void)
     /* Register any additional transpose functions */
     //registerTransFunction(block_trans, block_trans_desc);
     registerTransFunction(block_asym_trans, block_asym_trans_desc);
-    registerTransFunction(block_zigzag_trans, block_zigzag_trans_desc);
+    registerTransFunction(block_zigzag_trans_2, block_zigzag_trans_2_desc);
 }
 
 /* 
