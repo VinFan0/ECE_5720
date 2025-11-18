@@ -1,3 +1,11 @@
+/*
+ * Cache Lab
+ * ECE 5720
+ * Ryan Beck A02237765
+ * Josh Christensen A02375004
+ */
+
+
 /* 
  * trans.c - Matrix transpose B = A^T
  *
@@ -9,7 +17,7 @@
  */ 
 #include <stdio.h>
 #include "cachelab.h"
-
+#define BLOCK 8
 int is_transpose(int M, int N, int A[N][M], int B[M][N]);
 void trans(int M, int N, int A[N][M], int B[M][N]);	// Basic transpose function
 void zigzag_transpose(int N_start, int M_start,int M, int N, int A[N][M], int B[M][N], int block);
