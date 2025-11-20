@@ -1,0 +1,37 @@
+To Run the program:
+
+>make
+>cp example1/* .
+>./virtual 0x333
+TLB MISS
+PAGE FAULT
+>
+Explaination of files:
+
+virtual.cpp
+  The main code file for the program
+  all work on the assignment should be done in
+  this file. In particular, you will need to implement the function "translate" (Line 41).
+
+constants.cpp/constants.h
+  Contain specifications for the page table and tlb
+  These are in sperate file so the code in virtual.cpp
+  can be testing on multiple page table/tlb arrangments
+
+example1/
+  Contains basic constants files for the problems from
+  the textbook
+
+example2/
+  Contains a different example. This example has different
+  sizes for everything so the virtual address translation
+  code must be generic and work for any sizes
+
+autograde.sh
+  runs some autograding and searches the program output
+  for the correct physical address and MISS/HIT/PAGE FAULT
+
+Makefile
+  used by make to compile the program
+
+
