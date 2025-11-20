@@ -35,13 +35,91 @@ void printPageTable() {
   printf("\n");
 }
 
+// print int x as binary representation, divided into nybbles
+void print_hex_as_bin(int x, int length) {
+  for (int i = length; i >= 0; i--) {
+    putchar((x & (1u << i)) ? '1' : '0');
+    if (i % 4 == 0 && i != 0) putchar(' ');
+  }
+  putchar('\n');
+}
 
- 
+int searchTLB(int set, int tag) {
+  int result = 0;
+
+  printTLB();
+
+  for (int i=0; i<TLB_ASSOC; i++) {
+    if (tlb[set][i].tag == tag && tlb[set][i].valid) {
+      result = true;
+      // DEBUG printf("TLB HIT at set %d tag %x\n", set, tag);
+      printf("TLB HIT\n");
+      result = tlb[set][i].ppn;
+      return result;
+    }
+  }
+
+  printf("TLB MISS\n");
+  return result;
+}
+
+int searchPT(int vpn) {
+
+  printPageTable();
+
+  if(pageTableValid[vpn]) {
+    //printf("Found in pt\n");
+    return pageTable[vpn];
+  } else {
+    printf("PAGE FAULT\n");
+    return 0;
+  }
+
+}
+
 // translates virtual address to physical address
 int translate(int virtualAddress) {
   // TODO: implement address translation (insert code here)
   int physicalAddress = 0;
 
+  int page_offset_bits = log2(PAGE_SIZE);
+  //int page_offset_mask = (1<<page_offset_bits) - 1;
+
+  int virtual_page_number = virtualAddress >> page_offset_bits;
+
+  int tlb_set_number = TLB_SIZE / TLB_ASSOC;
+  int tlb_set_bits = log2(tlb_set_number);
+  int tlb_set_mask = (1<<tlb_set_bits) - 1;
+
+  int tlb_set = virtual_page_number & tlb_set_mask;
+  int tlb_tag = virtual_page_number >> tlb_set_bits;
+
+  int tlb_entry= searchTLB(tlb_set, tlb_tag);
+  if (tlb_entry != 0) {
+    physicalAddress = tlb_entry;
+  } else {
+    int pt_entry = searchPT(virtual_page_number);
+    if (pt_entry != 0) {
+      physicalAddress = pt_entry;
+    }
+  }
+
+  // DEBUG printing stuff
+  
+  printf("TLB Details\n");
+  printf("Page size: %d\n", PAGE_SIZE);
+  printf("VPO size: %d\n", page_offset_bits);
+  printf("VPN size: %d\n", VIRTUAL_WIDTH-page_offset_bits);
+  printf("Set bits: %d\n", tlb_set_bits);
+  printf("\n");
+
+  printf("Address: %x\n", virtualAddress);
+  print_hex_as_bin(virtualAddress, VIRTUAL_WIDTH);
+  printf("Virtual page number: ");
+  print_hex_as_bin(virtual_page_number, page_offset_bits); 
+  printf("Set: %d\n", tlb_set);
+  printf("Tag: %x\n", virtual_page_number >> tlb_set_bits);
+  
 
   return physicalAddress;
 }
